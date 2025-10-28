@@ -1,1 +1,219 @@
+<!DOCTYPE html>
 
+<html lang="en-US">
+<head>
+    <meta charset="utf-8">
+    <title>Japan Geography Explorer</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #side-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 400px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            margin: 10px;
+            border-radius: 4px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+            width: 100%;
+            border: 1px solid #ddd;
+            background: white;
+            margin-top: 10px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        button {
+            margin-bottom: 10px;
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        /* Hide side panel when screen width is less than 1024px */
+        @media screen and (max-width: 1024px) {
+            #side-panel {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="side-panel">
+        <h2>Japan Geography Data</h2>
+        <button onclick="sortTable()">Sort by Population</button>
+        <table id="dataTable">
+            <tr>
+                <th>Prefecture</th>
+                <th>Population</th>
+                <th>Area (km²)</th>
+            </tr>
+        </table>
+    </div>
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoiamFrb2J6aGFvIiwiYSI6ImNpcms2YWsyMzAwMmtmbG5icTFxZ3ZkdncifQ.P9MBej1xacybKcDN_jehvw';
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v10', // different style from earthquake map
+            zoom: 5,
+            center: [138, 38]
+        });
+
+        map.addControl(new mapboxgl.NavigationControl());
+
+        async function loadData() {
+            // Load Japan boundary data
+            const response = await fetch('assets/japan.json');
+            const japan = await response.json();
+
+            map.on('load', () => {
+                // Add Japan boundary source
+                map.addSource('japan', {
+                    type: 'geojson',
+                    data: japan
+                });
+
+                // Add fill layer
+                map.addLayer({
+                    'id': 'japan-fill',
+                    'type': 'fill',
+                    'source': 'japan',
+                    'paint': {
+                        'fill-color': [
+                            'interpolate',
+                            ['linear'],
+                            ['get', 'population'],
+                            0, '#fee5d9',
+                            1000000, '#fcae91',
+                            5000000, '#fb6a4a',
+                            10000000, '#de2d26',
+                            20000000, '#a50f15'
+                        ],
+                        'fill-opacity': 0.7
+                    }
+                });
+
+                // Add outline layer
+                map.addLayer({
+                    'id': 'japan-outline',
+                    'type': 'line',
+                    'source': 'japan',
+                    'paint': {
+                        'line-color': '#000',
+                        'line-width': 1
+                    }
+                });
+
+                // Add hover effect
+                map.on('mousemove', 'japan-fill', (e) => {
+                    if (e.features.length > 0) {
+                        map.getCanvas().style.cursor = 'pointer';
+                    }
+                });
+
+                map.on('mouseleave', 'japan-fill', () => {
+                    map.getCanvas().style.cursor = '';
+                });
+
+                // Add popup on click
+                map.on('click', 'japan-fill', (e) => {
+                    if (e.features.length > 0) {
+                        const feature = e.features[0];
+                        new mapboxgl.Popup()
+                            .setLngLat(e.lngLat)
+                            .setHTML(`
+                                <h3>${feature.properties.name}</h3>
+                                <p>Population: ${feature.properties.population.toLocaleString()}</p>
+                                <p>Area: ${feature.properties.area.toLocaleString()} km²</p>
+                            `)
+                            .addTo(map);
+                    }
+                });
+
+                // Populate table
+                const table = document.getElementById('dataTable');
+                japan.features.forEach(feature => {
+                    const row = table.insertRow(-1);
+                    row.insertCell(0).textContent = feature.properties.name;
+                    row.insertCell(1).textContent = feature.properties.population.toLocaleString();
+                    row.insertCell(2).textContent = feature.properties.area.toLocaleString();
+                });
+            });
+        }
+
+        function sortTable() {
+            const table = document.getElementById('dataTable');
+            const rows = Array.from(table.rows).slice(1); // Skip header row
+            rows.sort((a, b) => {
+                const aValue = parseFloat(a.cells[1].textContent.replace(/,/g, ''));
+                const bValue = parseFloat(b.cells[1].textContent.replace(/,/g, ''));
+                return bValue - aValue;
+            });
+            
+            // Remove existing rows
+            while (table.rows.length > 1) {
+                table.deleteRow(1);
+            }
+            
+            // Add sorted rows
+            rows.forEach(row => table.appendChild(row));
+        }
+
+        loadData();
+    </script>
+</body>
+</html>
