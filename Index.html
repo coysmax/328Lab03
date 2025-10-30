@@ -93,15 +93,13 @@
 <body>
     <div id="map"></div>
     <div id="side-panel">
-    <h2>Japan Geography Data</h2>
-    <button>Sort by Population</button>
-    <button id="toggleEQ">Hide Earthquakes</button>
-    <button id="toggleParks">Hide Parks</button>
+        <h2>Parks Explorer</h2>
+        <button id="sortName">Sort by Name</button>
+        <button id="toggleParks">Hide Parks</button>
         <table id="dataTable">
             <tr>
-                <th>Prefecture</th>
-                <th>Population</th>
-                <th>Area (km²)</th>
+                <th>Name</th>
+                <th>City</th>
             </tr>
         </table>
     </div>
@@ -127,261 +125,98 @@
         map.addControl(new mapboxgl.NavigationControl());
 
         async function loadData() {
-            // Load both datasets before map setup
-            console.log('Starting data fetch...');
-            let response, earthquakes, japan;
-            
-            try {
-                // Load Japan boundary data
-                console.log('Fetching Japan data from:', 'assets/japan.json');
-                response = await fetch('assets/japan.json');
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                japan = await response.json();
-                console.log('Japan data loaded successfully:', japan.features ? japan.features.length + ' features' : 'No features');
+            console.log('Starting parks-only data fetch...');
+            let response, parks;
 
-                // Load earthquake data
-                console.log('Fetching earthquake data from:', 'assets/earthquakes.geojson');
-                response = await fetch('assets/earthquakes.geojson');
-                if (!response.ok) {
-                    throw new Error(`HTTP error loading earthquakes! status: ${response.status}`);
-                }
-                earthquakes = await response.json();
-                console.log('Earthquakes data loaded successfully:', earthquakes.features ? earthquakes.features.length + ' features' : 'No features');
-            } catch (error) {
-                console.error('Error loading data:', error);
+            try {
+                console.log('Fetching parks data from: assets/parks.geojson');
+                response = await fetch('assets/parks.geojson');
+                if (!response.ok) throw new Error(`HTTP error loading parks: ${response.status}`);
+                parks = await response.json();
+                console.log('Parks loaded successfully:', parks.features ? parks.features.length + ' features' : 'No features');
+            } catch (err) {
+                console.error('Failed to load parks:', err);
                 return;
             }
 
-            map.on('load', async () => {
-                console.log('map load event fired (index.html)');
-                // Add Japan boundary source
-                map.addSource('japan', {
-                    type: 'geojson',
-                    data: japan
-                });
+            // Add parks when map has loaded
+            map.on('load', () => {
+                console.log('map load event fired (index.html) -- adding parks layer');
+                map.addSource('parks', { type: 'geojson', data: parks });
 
-                // Add fill layer
                 map.addLayer({
-                    'id': 'japan-fill',
-                    'type': 'fill',
-                    'source': 'japan',
-                    'paint': {
-                        'fill-color': [
-                            'interpolate',
-                            ['linear'],
-                            ['get', 'population'],
-                            0, '#fee5d9',
-                            1000000, '#fcae91',
-                            5000000, '#fb6a4a',
-                            10000000, '#de2d26',
-                            20000000, '#a50f15'
-                        ],
-                        'fill-opacity': 0.7
+                    id: 'parks-layer',
+                    type: 'circle',
+                    source: 'parks',
+                    paint: {
+                        'circle-radius': 6,
+                        'circle-color': '#2b8cbe',
+                        'circle-stroke-color': '#fff',
+                        'circle-stroke-width': 1
                     }
                 });
 
-                // Add outline layer
-                map.addLayer({
-                    'id': 'japan-outline',
-                    'type': 'line',
-                    'source': 'japan',
-                    'paint': {
-                        'line-color': '#000',
-                        'line-width': 1
-                    }
+                map.on('click', 'parks-layer', (e) => {
+                    const f = e.features && e.features[0];
+                    if (!f) return;
+                    new mapboxgl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(`<strong>${f.properties.name}</strong><br>${f.properties.city}`)
+                        .addTo(map);
                 });
 
-                // Add hover effect
-                map.on('mousemove', 'japan-fill', (e) => {
-                    if (e.features.length > 0) {
-                        map.getCanvas().style.cursor = 'pointer';
-                    }
+                map.on('mouseenter', 'parks-layer', () => map.getCanvas().style.cursor = 'pointer');
+                map.on('mouseleave', 'parks-layer', () => map.getCanvas().style.cursor = '');
+
+                // Wire toggle for parks
+                const toggleParks = document.getElementById('toggleParks');
+                let parksVisible = true;
+                toggleParks.addEventListener('click', () => {
+                    parksVisible = !parksVisible;
+                    map.setLayoutProperty('parks-layer', 'visibility', parksVisible ? 'visible' : 'none');
+                    toggleParks.textContent = parksVisible ? 'Hide Parks' : 'Show Parks';
                 });
 
-                map.on('mouseleave', 'japan-fill', () => {
-                    map.getCanvas().style.cursor = '';
-                });
-
-                // Add popup on click
-                map.on('click', 'japan-fill', (e) => {
-                    if (e.features.length > 0) {
-                        const feature = e.features[0];
-                        new mapboxgl.Popup()
-                            .setLngLat(e.lngLat)
-                            .setHTML(`
-                                <h3>${feature.properties.name}</h3>
-                                <p>Population: ${feature.properties.population.toLocaleString()}</p>
-                                <p>Area: ${feature.properties.area.toLocaleString()} km²</p>
-                            `)
-                            .addTo(map);
-                    }
-                });
-
-                // Populate table
+                // Populate table with parks
                 const table = document.getElementById('dataTable');
-                japan.features.forEach(feature => {
+                parks.features.forEach(feature => {
                     const row = table.insertRow(-1);
                     row.insertCell(0).textContent = feature.properties.name;
-                    row.insertCell(1).textContent = feature.properties.population.toLocaleString();
-                    row.insertCell(2).textContent = feature.properties.area.toLocaleString();
+                    row.insertCell(1).textContent = feature.properties.city || '';
                 });
-
-                // Load earthquakes dataset and add as a separate layer (async/await)
-                try {
-                    const eqResp = await fetch('assets/earthquakes.geojson');
-                    const eqData = await eqResp.json();
-
-                    // Add earthquakes source
-                    map.addSource('earthquakes', {
-                        type: 'geojson',
-                        data: eqData
-                    });
-
-                    // Add earthquake circles layer
-                    map.addLayer({
-                        id: 'earthquakes-circles',
-                        type: 'circle',
-                        source: 'earthquakes',
-                        paint: {
-                            'circle-radius': [
-                                'interpolate', ['linear'], ['get', 'mag'],
-                                0, 2,
-                                4, 6,
-                                6, 12
-                            ],
-                            'circle-color': [
-                                'interpolate', ['linear'], ['get', 'mag'],
-                                0, '#fee5d9',
-                                4, '#fcae91',
-                                5.5, '#fb6a4a',
-                                7, '#de2d26'
-                            ],
-                            'circle-opacity': 0.8,
-                            'circle-stroke-color': '#222',
-                            'circle-stroke-width': 0.5
-                        }
-                    });
-
-                    // Popup for earthquakes
-                    map.on('click', 'earthquakes-circles', (e) => {
-                        const feat = e.features && e.features[0];
-                        if (!feat) return;
-                        const mag = feat.properties.mag || 'N/A';
-                        const id = feat.properties.id || '';
-                        const time = feat.properties.time ? new Date(feat.properties.time).toLocaleString() : '';
-                        new mapboxgl.Popup()
-                            .setLngLat(e.lngLat)
-                            .setHTML(`<strong>id:</strong> ${id}<br><strong>mag:</strong> ${mag}<br><strong>time:</strong> ${time}`)
-                            .addTo(map);
-                    });
-
-                    map.on('mouseenter', 'earthquakes-circles', () => map.getCanvas().style.cursor = 'pointer');
-                    map.on('mouseleave', 'earthquakes-circles', () => map.getCanvas().style.cursor = '');
-
-                    // Wire toggle button for earthquakes
-                    const toggleBtn = document.getElementById('toggleEQ');
-                    let eqVisible = true;
-                    toggleBtn.addEventListener('click', () => {
-                        eqVisible = !eqVisible;
-                        map.setLayoutProperty('earthquakes-circles', 'visibility', eqVisible ? 'visible' : 'none');
-                        toggleBtn.textContent = eqVisible ? 'Hide Earthquakes' : 'Show Earthquakes';
-                    });
-
-                } catch (err) {
-                    console.error('Failed to load earthquakes:', err);
-                }
-
-                // Load parks dataset and add a points layer
-                try {
-                    const parksResp = await fetch('assets/parks.geojson');
-                    const parks = await parksResp.json();
-                    console.log('Parks loaded:', parks.features ? parks.features.length : 0);
-
-                    map.addSource('parks', { type: 'geojson', data: parks });
-
-                    map.addLayer({
-                        id: 'parks-layer',
-                        type: 'circle',
-                        source: 'parks',
-                        paint: {
-                            'circle-radius': 6,
-                            'circle-color': '#2b8cbe',
-                            'circle-stroke-color': '#fff',
-                            'circle-stroke-width': 1
-                        }
-                    });
-
-                    map.on('click', 'parks-layer', (e) => {
-                        const f = e.features && e.features[0];
-                        if (!f) return;
-                        new mapboxgl.Popup()
-                            .setLngLat(e.lngLat)
-                            .setHTML(`<strong>${f.properties.name}</strong><br>${f.properties.city}`)
-                            .addTo(map);
-                    });
-
-                    map.on('mouseenter', 'parks-layer', () => map.getCanvas().style.cursor = 'pointer');
-                    map.on('mouseleave', 'parks-layer', () => map.getCanvas().style.cursor = '');
-
-                    // Wire toggle for parks
-                    const toggleParks = document.getElementById('toggleParks');
-                    let parksVisible = true;
-                    toggleParks.addEventListener('click', () => {
-                        parksVisible = !parksVisible;
-                        map.setLayoutProperty('parks-layer', 'visibility', parksVisible ? 'visible' : 'none');
-                        toggleParks.textContent = parksVisible ? 'Hide Parks' : 'Show Parks';
-                    });
-
-                } catch (err) {
-                    console.error('Failed to load parks:', err);
-                }
             });
-
-            // Set up sort button
-            const sortBtn = document.querySelector('button');
-            sortBtn.addEventListener('click', sortTable);
         }
 
-        // Start loading the data
+        // Start loading the data (parks only)
         loadData();
 
+        // Sort table by park name (column 0)
         function sortTable(e) {
             let table, rows, switching, i, x, y, shouldSwitch;
             table = document.getElementById('dataTable');
             switching = true;
-            
-            /*Make a loop that will continue until
-            no switching has been done:*/
+
             while (switching) {
-                //start by saying: no switching is done:
                 switching = false;
                 rows = table.rows;
-                /*Loop through all table rows (except the
-                first, which contains table headers):*/
                 for (i = 1; i < (rows.length - 1); i++) {
-                    //start by saying there should be no switching:
                     shouldSwitch = false;
-                    /*Get the two elements you want to compare,
-                    one from current row and one from the next:*/
-                    x = parseFloat(rows[i].getElementsByTagName("td")[1].innerHTML.replace(/,/g, ''));
-                    y = parseFloat(rows[i + 1].getElementsByTagName("td")[1].innerHTML.replace(/,/g, ''));
-                    //check if the two rows should switch place:
-                    if (x < y) {
-                        //if so, mark as a switch and break the loop:
+                    x = rows[i].getElementsByTagName('td')[0].textContent.toLowerCase();
+                    y = rows[i + 1].getElementsByTagName('td')[0].textContent.toLowerCase();
+                    if (x > y) { // alphabetical ascending
                         shouldSwitch = true;
                         break;
                     }
                 }
                 if (shouldSwitch) {
-                    /*If a switch has been marked, make the switch
-                    and mark that a switch has been done:*/
                     rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
                     switching = true;
                 }
             }
         }
+
+        // Wire sort button
+        document.getElementById('sortName').addEventListener('click', sortTable);
     </script>
 </body>
 </html>
