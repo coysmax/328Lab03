@@ -109,135 +109,96 @@
             response = await fetch('assets/japan.json');
             japan = await response.json();
 
-            // Add Japan boundary source and layer
+            // Add Japan and earthquakes sources and layers when map loads
             map.on('load', () => {
+                // Japan outline/fill layer
                 map.addSource('japan', {
                     type: 'geojson',
                     data: japan
                 });
 
                 map.addLayer({
-                    'id': 'japan-layer',
-                    'type': 'line',
-                    'source': 'japan',
-                    'paint': {
+                    id: 'japan-layer',
+                    type: 'fill',
+                    source: 'japan',
+                    paint: {
+                        'fill-color': '#0080ff',
+                        'fill-opacity': 0.25
+                    }
+                });
+
+                map.addLayer({
+                    id: 'japan-outline',
+                    type: 'line',
+                    source: 'japan',
+                    paint: {
                         'line-color': '#ffffff',
                         'line-width': 1
                     }
                 });
 
-                // Add earthquakes source
+                // Earthquakes as circles
                 map.addSource('earthquakes', {
                     type: 'geojson',
                     data: earthquakes
                 });
 
-                // Add earthquakes layer
                 map.addLayer({
-                    'id': 'earthquakes-layer',
-                    'type': 'circle',
-                    'source': 'earthquakes',
-                    'paint': {
+                    id: 'earthquakes-layer',
+                    type: 'circle',
+                    source: 'earthquakes',
+                    paint: {
                         'circle-radius': [
-                            'interpolate',
-                            ['linear'],
-                            ['get', 'magnitude'],
-                            4.0, 5,
-                            8.0, 25
+                            'interpolate', ['linear'], ['get', 'mag'],
+                            3, 4,
+                            5, 8,
+                            7, 18
                         ],
                         'circle-color': [
-                            'interpolate',
-                            ['linear'],
-                            ['get', 'magnitude'],
-                            4.0, '#eff3ff',
-                            5.0, '#bdd7e7',
-                            6.0, '#6baed6',
-                            7.0, '#3182bd',
-                            8.0, '#08519c'
+                            'interpolate', ['linear'], ['get', 'mag'],
+                            3, '#fee0d2',
+                            4.5, '#fc9272',
+                            6, '#de2d26'
                         ],
-                        'circle-opacity': 0.8
+                        'circle-opacity': 0.8,
+                        'circle-stroke-color': '#fff',
+                        'circle-stroke-width': 1
                     }
                 });
+
+                // Popup for earthquakes
+                map.on('click', 'earthquakes-layer', (e) => {
+                    const feat = e.features && e.features[0];
+                    if (!feat) return;
+                    const mag = feat.properties.mag;
+                    const id = feat.properties.id;
+                    const time = feat.properties.time ? new Date(feat.properties.time).toLocaleString() : '';
+                    new mapboxgl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(`<strong>id:</strong> ${id}<br><strong>mag:</strong> ${mag}<br><strong>time:</strong> ${time}`)
+                        .addTo(map);
+                });
+
+                map.on('mouseenter', 'earthquakes-layer', () => map.getCanvas().style.cursor = 'pointer');
+                map.on('mouseleave', 'earthquakes-layer', () => map.getCanvas().style.cursor = '');
             });
 
-            // Populate table with earthquake data
+            // Populate table with earthquake data (single, consistent loop)
             table = document.querySelector('table');
-            earthquakes.features.forEach(earthquake => {
-                let row = document.createElement('tr');
-                let timestamp = new Date(earthquake.properties.time).toLocaleString();
-                row.innerHTML = `<td>${earthquake.properties.code}</td>
-                               <td>${earthquake.properties.magnitude}</td>
-                               <td>${timestamp}</td>`;
-                table.appendChild(row);
+            earthquakes.features.forEach(f => {
+                const tr = document.createElement('tr');
+                const ts = f.properties.time ? new Date(f.properties.time).toLocaleString() : '';
+                tr.innerHTML = `<td>${f.properties.id}</td><td>${f.properties.mag}</td><td>${ts}</td>`;
+                table.appendChild(tr);
             });
 
-            // Add sort functionality
-            document.querySelector('button').addEventListener('click', () => {
-                let rows = Array.from(table.querySelectorAll('tr:not(:first-child)'));
-                rows.sort((a, b) => {
-                    let magnitudeA = parseFloat(a.children[1].textContent);
-                    let magnitudeB = parseFloat(b.children[1].textContent);
-                    return magnitudeB - magnitudeA;
-                });
-                
-                // Remove existing rows (except header)
-                rows.forEach(row => row.remove());
-                
-                // Add sorted rows
-                rows.forEach(row => table.appendChild(row));
-            });
-
-            table = document.getElementsByTagName("table")[0];
-            let row, cell1, cell2, cell3;
-            for (let i = 0; i < earthquakes.features.length; i++) {
-                // Create an empty <tr> element and add it to the 1st position of the table:
-                row = table.insertRow(-1);
-                cell1 = row.insertCell(0);
-                cell2 = row.insertCell(1);
-                cell3 = row.insertCell(2);
-                cell1.innerHTML = earthquakes.features[i].properties.id;
-                cell2.innerHTML = earthquakes.features[i].properties.mag;
-                cell3.innerHTML = new Date(earthquakes.features[i].properties.time).toLocaleDateString(
-                    "en-US");
-            }
-
-
-            //load data to the map as new layers and table on the side.
-            map.on('load', function loadingData() {
-
-                map.addSource('earthquakes', {
-                    type: 'geojson',
-                    data: earthquakes
-                });
-
-                map.addLayer({
-                    'id': 'earthquakes-layer',
-                    'type': 'circle',
-                    'source': 'earthquakes',
-                    'paint': {
-                        'circle-radius': 8,
-                        'circle-stroke-width': 2,
-                        'circle-color': 'red',
-                        'circle-stroke-color': 'white'
-                    }
-                });
-
-
-                map.addSource('japan', {
-                    type: 'geojson',
-                    data: japan
-                });
-
-                map.addLayer({
-                    'id': 'japan-layer',
-                    'type': 'fill',
-                    'source': 'japan',
-                    'paint': {
-                        'fill-color': '#0080ff', // blue color fill
-                        'fill-opacity': 0.5
-                    }
-                });
-
+            // Add sort functionality (by magnitude)
+            const sortBtn = document.querySelector('#side-panel button') || document.querySelector('button');
+            sortBtn.addEventListener('click', () => {
+                const rows = Array.from(table.querySelectorAll('tr:not(:first-child)'));
+                rows.sort((a, b) => parseFloat(b.children[1].textContent) - parseFloat(a.children[1].textContent));
+                // Reattach sorted rows
+                rows.forEach(r => table.appendChild(r));
             });
 
         }
