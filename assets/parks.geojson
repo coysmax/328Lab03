@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "name": "Ueno Park", "city": "Tokyo" }, "geometry": { "type": "Point", "coordinates": [139.7745,35.7148] } },
+    { "type": "Feature", "properties": { "name": "Yoyogi Park", "city": "Tokyo" }, "geometry": { "type": "Point", "coordinates": [139.6921,35.6717] } },
+    { "type": "Feature", "properties": { "name": "Maruyama Park", "city": "Sapporo" }, "geometry": { "type": "Point", "coordinates": [141.3545,43.0558] } },
+    { "type": "Feature", "properties": { "name": "Nijo Castle Garden", "city": "Kyoto" }, "geometry": { "type": "Point", "coordinates": [135.7536,35.0116] } },
+    { "type": "Feature", "properties": { "name": "Osaka Castle Park", "city": "Osaka" }, "geometry": { "type": "Point", "coordinates": [135.5259,34.6873] } }
+  ]
+}

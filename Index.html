@@ -93,9 +93,10 @@
 <body>
     <div id="map"></div>
     <div id="side-panel">
-        <h2>Japan Geography Data</h2>
-        <button>Sort by Population</button>
-        <button id="toggleEQ">Hide Earthquakes</button>
+    <h2>Japan Geography Data</h2>
+    <button>Sort by Population</button>
+    <button id="toggleEQ">Hide Earthquakes</button>
+    <button id="toggleParks">Hide Parks</button>
         <table id="dataTable">
             <tr>
                 <th>Prefecture</th>
@@ -279,7 +280,7 @@
                     map.on('mouseenter', 'earthquakes-circles', () => map.getCanvas().style.cursor = 'pointer');
                     map.on('mouseleave', 'earthquakes-circles', () => map.getCanvas().style.cursor = '');
 
-                    // Wire toggle button
+                    // Wire toggle button for earthquakes
                     const toggleBtn = document.getElementById('toggleEQ');
                     let eqVisible = true;
                     toggleBtn.addEventListener('click', () => {
@@ -287,8 +288,54 @@
                         map.setLayoutProperty('earthquakes-circles', 'visibility', eqVisible ? 'visible' : 'none');
                         toggleBtn.textContent = eqVisible ? 'Hide Earthquakes' : 'Show Earthquakes';
                     });
+
                 } catch (err) {
                     console.error('Failed to load earthquakes:', err);
+                }
+
+                // Load parks dataset and add a points layer
+                try {
+                    const parksResp = await fetch('assets/parks.geojson');
+                    const parks = await parksResp.json();
+                    console.log('Parks loaded:', parks.features ? parks.features.length : 0);
+
+                    map.addSource('parks', { type: 'geojson', data: parks });
+
+                    map.addLayer({
+                        id: 'parks-layer',
+                        type: 'circle',
+                        source: 'parks',
+                        paint: {
+                            'circle-radius': 6,
+                            'circle-color': '#2b8cbe',
+                            'circle-stroke-color': '#fff',
+                            'circle-stroke-width': 1
+                        }
+                    });
+
+                    map.on('click', 'parks-layer', (e) => {
+                        const f = e.features && e.features[0];
+                        if (!f) return;
+                        new mapboxgl.Popup()
+                            .setLngLat(e.lngLat)
+                            .setHTML(`<strong>${f.properties.name}</strong><br>${f.properties.city}`)
+                            .addTo(map);
+                    });
+
+                    map.on('mouseenter', 'parks-layer', () => map.getCanvas().style.cursor = 'pointer');
+                    map.on('mouseleave', 'parks-layer', () => map.getCanvas().style.cursor = '');
+
+                    // Wire toggle for parks
+                    const toggleParks = document.getElementById('toggleParks');
+                    let parksVisible = true;
+                    toggleParks.addEventListener('click', () => {
+                        parksVisible = !parksVisible;
+                        map.setLayoutProperty('parks-layer', 'visibility', parksVisible ? 'visible' : 'none');
+                        toggleParks.textContent = parksVisible ? 'Hide Parks' : 'Show Parks';
+                    });
+
+                } catch (err) {
+                    console.error('Failed to load parks:', err);
                 }
             });
 
