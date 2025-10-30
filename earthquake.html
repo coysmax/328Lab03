@@ -106,11 +106,14 @@
             let response, earthquakes, japan, table;
             response = await fetch('assets/earthquakes.geojson');
             earthquakes = await response.json();
+            console.log('earthquake data loaded:', earthquakes && earthquakes.features ? earthquakes.features.length : 0);
             response = await fetch('assets/japan.json');
             japan = await response.json();
+            console.log('japan data loaded:', japan && japan.features ? japan.features.length : 0);
 
             // Add Japan and earthquakes sources and layers when map loads
             map.on('load', () => {
+                console.log('map load event fired (earthquake.html)');
                 // Japan outline/fill layer
                 map.addSource('japan', {
                     type: 'geojson',
