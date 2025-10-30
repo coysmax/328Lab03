@@ -112,7 +112,7 @@
             console.log('japan data loaded:', japan && japan.features ? japan.features.length : 0);
 
             // Add Japan and earthquakes sources and layers when map loads
-            map.on('load', () => {
+            map.on('load', async () => {
                 console.log('map load event fired (earthquake.html)');
                 // Japan outline/fill layer
                 map.addSource('japan', {
@@ -186,33 +186,27 @@
                 map.on('mouseleave', 'earthquakes-layer', () => map.getCanvas().style.cursor = '');
             });
 
-            // Populate table with earthquake data (single, consistent loop)
-            table = document.querySelector('table');
-            earthquakes.features.forEach(f => {
-                const tr = document.createElement('tr');
-                const ts = f.properties.time ? new Date(f.properties.time).toLocaleString() : '';
-                tr.innerHTML = `<td>${f.properties.id}</td><td>${f.properties.mag}</td><td>${ts}</td>`;
-                table.appendChild(tr);
-            });
+            // Populate table with earthquake data
+            table = document.getElementsByTagName("table")[0];
+            let row, cell1, cell2, cell3;
+            for (let i = 0; i < earthquakes.features.length; i++) {
+                // Create an empty <tr> element and add it to the last position of the table
+                row = table.insertRow(-1);
+                cell1 = row.insertCell(0);
+                cell2 = row.insertCell(1);
+                cell3 = row.insertCell(2);
+                cell1.innerHTML = earthquakes.features[i].properties.id;
+                cell2.innerHTML = earthquakes.features[i].properties.mag;
+                cell3.innerHTML = new Date(earthquakes.features[i].properties.time).toLocaleDateString("en-US");
+            }
 
-            // Add sort functionality (by magnitude)
-            const sortBtn = document.querySelector('#side-panel button') || document.querySelector('button');
-            sortBtn.addEventListener('click', () => {
-                const rows = Array.from(table.querySelectorAll('tr:not(:first-child)'));
-                rows.sort((a, b) => parseFloat(b.children[1].textContent) - parseFloat(a.children[1].textContent));
-                // Reattach sorted rows
-                rows.forEach(r => table.appendChild(r));
-            });
+            // Set up sort button
+            let btn = document.getElementsByTagName("button")[0];
+            btn.addEventListener('click', sortTable);
 
         }
 
-        geojsonFetch();
-
-        let btn = document.getElementsByTagName("button")[0];
-
-        btn.addEventListener('click', sortTable);
-
-        // define the function to sort table
+        // define the function to sort table by magnitude
         function sortTable(e) {
             let table, rows, switching, i, x, y, shouldSwitch;
             table = document.getElementsByTagName("table")[0];
