@@ -105,13 +105,22 @@
         </table>
     </div>
     <script>
-    mapboxgl.accessToken = 'pk.eyJ1IjoiY295c21heCIsImEiOiJjbWhjeGVxbWQxZjV3MmpwcjlsNGNoc2pkIn0.lN8fMUCO0-cVKDiQW_G7tg';
+        console.log('Starting map initialization...');
+        mapboxgl.accessToken = 'pk.eyJ1IjoiY295c21heCIsImEiOiJjbWhjeGVxbWQxZjV3MmpwcjlsNGNoc2pkIn0.lN8fMUCO0-cVKDiQW_G7tg';
 
         const map = new mapboxgl.Map({
             container: 'map',
-            style: 'mapbox://styles/mapbox/light-v10', // different style from earthquake map
+            style: 'mapbox://styles/mapbox/light-v10',
             zoom: 5,
             center: [138, 38]
+        });
+
+        map.on('load', () => {
+            console.log('Map loaded successfully');
+        });
+
+        map.on('error', (e) => {
+            console.error('Map error:', e);
         });
 
         map.addControl(new mapboxgl.NavigationControl());
@@ -119,16 +128,30 @@
         async function loadData() {
             // Load both datasets before map setup
             console.log('Starting data fetch...');
+            let response, earthquakes, japan;
             
-            // Load Japan boundary data
-            let response = await fetch('assets/japan.json');
-            const japan = await response.json();
-            console.log('Japan data loaded');
+            try {
+                // Load Japan boundary data
+                console.log('Fetching Japan data from:', 'assets/japan.json');
+                response = await fetch('assets/japan.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                japan = await response.json();
+                console.log('Japan data loaded successfully:', japan.features ? japan.features.length + ' features' : 'No features');
 
-            // Load earthquake data
-            response = await fetch('assets/earthquakes.geojson');
-            const earthquakes = await response.json();
-            console.log('Earthquakes data loaded');
+                // Load earthquake data
+                console.log('Fetching earthquake data from:', 'assets/earthquakes.geojson');
+                response = await fetch('assets/earthquakes.geojson');
+                if (!response.ok) {
+                    throw new Error(`HTTP error loading earthquakes! status: ${response.status}`);
+                }
+                earthquakes = await response.json();
+                console.log('Earthquakes data loaded successfully:', earthquakes.features ? earthquakes.features.length + ' features' : 'No features');
+            } catch (error) {
+                console.error('Error loading data:', error);
+                return;
+            }
 
             map.on('load', async () => {
                 console.log('map load event fired (index.html)');
@@ -312,8 +335,6 @@
                 }
             }
         }
-
-        loadData();
     </script>
 </body>
 </html>

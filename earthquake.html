@@ -85,9 +85,9 @@
 
     </main>
     <script>
+        console.log('Starting map initialization...');
         // Define the Mapbox access token
-        mapboxgl.accessToken =
-            'pk.eyJ1IjoiY295c21heCIsImEiOiJjbWhjeGVxbWQxZjV3MmpwcjlsNGNoc2pkIn0.lN8fMUCO0-cVKDiQW_G7tg';
+        mapboxgl.accessToken = 'pk.eyJ1IjoiY295c21heCIsImEiOiJjbWhjeGVxbWQxZjV3MmpwcjlsNGNoc2pkIn0.lN8fMUCO0-cVKDiQW_G7tg';
 
         // Create the map object
         let map = new mapboxgl.Map({
@@ -97,19 +97,42 @@
             center: [138, 38] // starting center
         });
 
+        map.on('load', () => {
+            console.log('Map loaded successfully');
+        });
+
+        map.on('error', (e) => {
+            console.error('Map error:', e);
+        });
+
         // Add navigation controls
         map.addControl(new mapboxgl.NavigationControl());
 
 
         async function geojsonFetch() {
-            // Fetch earthquake and Japan boundary data
             let response, earthquakes, japan, table;
-            response = await fetch('assets/earthquakes.geojson');
-            earthquakes = await response.json();
-            console.log('earthquake data loaded:', earthquakes && earthquakes.features ? earthquakes.features.length : 0);
-            response = await fetch('assets/japan.json');
-            japan = await response.json();
-            console.log('japan data loaded:', japan && japan.features ? japan.features.length : 0);
+            
+            try {
+                // Fetch earthquake and Japan boundary data
+                console.log('Fetching earthquake data from:', 'assets/earthquakes.geojson');
+                response = await fetch('assets/earthquakes.geojson');
+                if (!response.ok) {
+                    throw new Error(`HTTP error loading earthquakes! status: ${response.status}`);
+                }
+                earthquakes = await response.json();
+                console.log('Earthquake data loaded successfully:', earthquakes && earthquakes.features ? earthquakes.features.length + ' features' : 'No features');
+                
+                console.log('Fetching Japan data from:', 'assets/japan.json');
+                response = await fetch('assets/japan.json');
+                if (!response.ok) {
+                    throw new Error(`HTTP error loading japan data! status: ${response.status}`);
+                }
+                japan = await response.json();
+                console.log('Japan data loaded successfully:', japan && japan.features ? japan.features.length + ' features' : 'No features');
+            } catch (error) {
+                console.error('Error loading data:', error);
+                return;
+            }
 
             // Add Japan and earthquakes sources and layers when map loads
             map.on('load', async () => {
@@ -205,6 +228,9 @@
             btn.addEventListener('click', sortTable);
 
         }
+
+        // Start loading geojson data and adding layers
+        geojsonFetch();
 
         // define the function to sort table by magnitude
         function sortTable(e) {
