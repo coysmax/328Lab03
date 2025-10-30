@@ -1,0 +1,10 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    { "type": "Feature", "properties": { "name": "Tokyo National Museum", "city": "Tokyo" }, "geometry": { "type": "Point", "coordinates": [139.7765,35.7188] } },
+    { "type": "Feature", "properties": { "name": "National Museum of Nature and Science", "city": "Tokyo" }, "geometry": { "type": "Point", "coordinates": [139.7768,35.7186] } },
+    { "type": "Feature", "properties": { "name": "Hokkaido Museum", "city": "Sapporo" }, "geometry": { "type": "Point", "coordinates": [141.3683,43.0638] } },
+    { "type": "Feature", "properties": { "name": "Kyoto National Museum", "city": "Kyoto" }, "geometry": { "type": "Point", "coordinates": [135.7764,34.9879] } },
+    { "type": "Feature", "properties": { "name": "Osaka Museum of History", "city": "Osaka" }, "geometry": { "type": "Point", "coordinates": [135.5196,34.6873] } }
+  ]
+}

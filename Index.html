@@ -93,9 +93,10 @@
 <body>
     <div id="map"></div>
     <div id="side-panel">
-        <h2>Parks Explorer</h2>
-        <button id="sortName">Sort by Name</button>
-        <button id="toggleParks">Hide Parks</button>
+    <h2>Parks & Museums Explorer</h2>
+    <button id="sortName">Sort by Name</button>
+    <button id="toggleParks">Hide Parks</button>
+    <button id="toggleMuseums">Hide Museums</button>
         <table id="dataTable">
             <tr>
                 <th>Name</th>
@@ -125,24 +126,30 @@
         map.addControl(new mapboxgl.NavigationControl());
 
         async function loadData() {
-            console.log('Starting parks-only data fetch...');
-            let response, parks;
+            console.log('Starting parks + museums data fetch...');
+                let response, parks, museums;
 
-            try {
-                console.log('Fetching parks data from: assets/parks.geojson');
-                response = await fetch('assets/parks.geojson');
-                if (!response.ok) throw new Error(`HTTP error loading parks: ${response.status}`);
-                parks = await response.json();
-                console.log('Parks loaded successfully:', parks.features ? parks.features.length + ' features' : 'No features');
-            } catch (err) {
-                console.error('Failed to load parks:', err);
-                return;
-            }
+                try {
+                    console.log('Fetching parks data from: assets/parks.geojson');
+                    response = await fetch('assets/parks.geojson');
+                    if (!response.ok) throw new Error(`HTTP error loading parks: ${response.status}`);
+                    parks = await response.json();
+                    console.log('Parks loaded successfully:', parks.features ? parks.features.length + ' features' : 'No features');
 
-            // Add parks when map has loaded
-            map.on('load', () => {
-                console.log('map load event fired (index.html) -- adding parks layer');
-                map.addSource('parks', { type: 'geojson', data: parks });
+                    console.log('Fetching museums data from: assets/museums.geojson');
+                    response = await fetch('assets/museums.geojson');
+                    if (!response.ok) throw new Error(`HTTP error loading museums: ${response.status}`);
+                    museums = await response.json();
+                    console.log('Museums loaded successfully:', museums.features ? museums.features.length + ' features' : 'No features');
+                } catch (err) {
+                    console.error('Failed to load datasets:', err);
+                    return;
+                }
+
+                // Add parks & museums when map has loaded
+                map.on('load', () => {
+                    console.log('map load event fired (index.html) -- adding parks & museums layers');
+                    map.addSource('parks', { type: 'geojson', data: parks });
 
                 map.addLayer({
                     id: 'parks-layer',
@@ -177,9 +184,51 @@
                     toggleParks.textContent = parksVisible ? 'Hide Parks' : 'Show Parks';
                 });
 
+                // Wire toggle for museums
+                const toggleMuseums = document.getElementById('toggleMuseums');
+                let museumsVisible = true;
+                toggleMuseums.addEventListener('click', () => {
+                    museumsVisible = !museumsVisible;
+                    map.setLayoutProperty('museums-layer', 'visibility', museumsVisible ? 'visible' : 'none');
+                    toggleMuseums.textContent = museumsVisible ? 'Hide Museums' : 'Show Museums';
+                });
+
                 // Populate table with parks
                 const table = document.getElementById('dataTable');
                 parks.features.forEach(feature => {
+                    const row = table.insertRow(-1);
+                    row.insertCell(0).textContent = feature.properties.name;
+                    row.insertCell(1).textContent = feature.properties.city || '';
+                });
+
+                // Add museums source and layer
+                map.addSource('museums', { type: 'geojson', data: museums });
+                map.addLayer({
+                    id: 'museums-layer',
+                    type: 'circle',
+                    source: 'museums',
+                    paint: {
+                        'circle-radius': 6,
+                        'circle-color': '#7fc97f',
+                        'circle-stroke-color': '#fff',
+                        'circle-stroke-width': 1
+                    }
+                });
+
+                map.on('click', 'museums-layer', (e) => {
+                    const f = e.features && e.features[0];
+                    if (!f) return;
+                    new mapboxgl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(`<strong>${f.properties.name}</strong><br>${f.properties.city}`)
+                        .addTo(map);
+                });
+
+                map.on('mouseenter', 'museums-layer', () => map.getCanvas().style.cursor = 'pointer');
+                map.on('mouseleave', 'museums-layer', () => map.getCanvas().style.cursor = '');
+
+                // Populate table with museums (append)
+                museums.features.forEach(feature => {
                     const row = table.insertRow(-1);
                     row.insertCell(0).textContent = feature.properties.name;
                     row.insertCell(1).textContent = feature.properties.city || '';
