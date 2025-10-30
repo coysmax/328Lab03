@@ -95,6 +95,7 @@
     <div id="side-panel">
         <h2>Japan Geography Data</h2>
         <button onclick="sortTable()">Sort by Population</button>
+        <button id="toggleEQ">Toggle Earthquakes</button>
         <table id="dataTable">
             <tr>
                 <th>Prefecture</th>
@@ -192,6 +193,68 @@
                     row.insertCell(1).textContent = feature.properties.population.toLocaleString();
                     row.insertCell(2).textContent = feature.properties.area.toLocaleString();
                 });
+
+                // Load earthquakes dataset and add as a separate layer
+                fetch('assets/earthquakes.geojson')
+                    .then(resp => resp.json())
+                    .then(eqData => {
+                        // Add earthquakes source
+                        map.addSource('earthquakes', {
+                            type: 'geojson',
+                            data: eqData
+                        });
+
+                        // Add earthquake circles layer
+                        map.addLayer({
+                            id: 'earthquakes-circles',
+                            type: 'circle',
+                            source: 'earthquakes',
+                            paint: {
+                                'circle-radius': [
+                                    'interpolate', ['linear'], ['get', 'magnitude'],
+                                    0, 2,
+                                    4, 6,
+                                    6, 12
+                                ],
+                                'circle-color': [
+                                    'interpolate', ['linear'], ['get', 'magnitude'],
+                                    0, '#fee5d9',
+                                    4, '#fcae91',
+                                    5.5, '#fb6a4a',
+                                    7, '#de2d26'
+                                ],
+                                'circle-opacity': 0.8,
+                                'circle-stroke-color': '#222',
+                                'circle-stroke-width': 0.5
+                            }
+                        });
+
+                        // Popup for earthquakes
+                        map.on('click', 'earthquakes-circles', (e) => {
+                            const feat = e.features && e.features[0];
+                            if (!feat) return;
+                            const mag = feat.properties.magnitude || feat.properties.mag || 'N/A';
+                            const id = feat.properties.code || feat.id || '';
+                            const time = feat.properties.time ? new Date(feat.properties.time).toLocaleString() : '';
+                            new mapboxgl.Popup()
+                                .setLngLat(e.lngLat)
+                                .setHTML(`<strong>id:</strong> ${id}<br><strong>mag:</strong> ${mag}<br><strong>time:</strong> ${time}`)
+                                .addTo(map);
+                        });
+
+                        map.on('mouseenter', 'earthquakes-circles', () => map.getCanvas().style.cursor = 'pointer');
+                        map.on('mouseleave', 'earthquakes-circles', () => map.getCanvas().style.cursor = '');
+
+                        // Wire toggle button
+                        const toggleBtn = document.getElementById('toggleEQ');
+                        let eqVisible = true;
+                        toggleBtn.addEventListener('click', () => {
+                            eqVisible = !eqVisible;
+                            map.setLayoutProperty('earthquakes-circles', 'visibility', eqVisible ? 'visible' : 'none');
+                            toggleBtn.textContent = eqVisible ? 'Hide Earthquakes' : 'Show Earthquakes';
+                        });
+                    })
+                    .catch(err => console.error('Failed to load earthquakes:', err));
             });
         }
 
