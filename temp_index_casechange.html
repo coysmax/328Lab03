@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+
+<html lang="en-US">
+<head>
+    <meta charset="utf-8">
+    <title>Japan Geography Explorer</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.5.0/mapbox-gl.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        #side-panel {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 400px;
+            background: rgba(255, 255, 255, 0.9);
+            padding: 20px;
+            margin: 10px;
+            border-radius: 4px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        table {
+            border-collapse: collapse;
+            border-spacing: 0;
+            width: 100%;
+            border: 1px solid #ddd;
+            background: white;
+            margin-top: 10px;
+        }
+
+        th, td {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        tr:hover {
+            background-color: #f5f5f5;
+        }
+
+        button {
+            margin-bottom: 10px;
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        button:hover {
+            background: #45a049;
+        }
+
+        /* Hide side panel when screen width is less than 1024px */
+        @media screen and (max-width: 1024px) {
+            #side-panel {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+    <div id="side-panel">
+    <h2>Parks & Museums Explorer</h2>
+    <button id="sortName">Sort by Name</button>
+    <button id="toggleParks">Hide Parks</button>
+    <button id="toggleMuseums">Hide Museums</button>
+        <table id="dataTable">
+            <tr>
+                <th>Name</th>
+                <th>City</th>
+            </tr>
+        </table>
+    </div>
+    <script>
+        console.log('Starting map initialization...');
+        mapboxgl.accessToken = 'pk.eyJ1IjoiY295c21heCIsImEiOiJjbWhjeGVxbWQxZjV3MmpwcjlsNGNoc2pkIn0.lN8fMUCO0-cVKDiQW_G7tg';
+
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v10',
+            zoom: 5,
+            center: [138, 38]
+        });
+
+        map.on('load', () => {
+            console.log('Map loaded successfully');
+        });
+
+        map.on('error', (e) => {
+            console.error('Map error:', e);
+        });
+
+        map.addControl(new mapboxgl.NavigationControl());
+
+        async function loadData() {
+            console.log('Starting parks + museums data fetch...');
+                let response, parks, museums;
+
+                try {
+                    console.log('Fetching parks data from: assets/parks.geojson');
+                    response = await fetch('assets/parks.geojson');
+                    if (!response.ok) throw new Error(`HTTP error loading parks: ${response.status}`);
+                    parks = await response.json();
+                    console.log('Parks loaded successfully:', parks.features ? parks.features.length + ' features' : 'No features');
+
+                    console.log('Fetching museums data from: assets/museums.geojson');
+                    response = await fetch('assets/museums.geojson');
+                    if (!response.ok) throw new Error(`HTTP error loading museums: ${response.status}`);
+                    museums = await response.json();
+                    console.log('Museums loaded successfully:', museums.features ? museums.features.length + ' features' : 'No features');
+                } catch (err) {
+                    console.error('Failed to load datasets:', err);
+                    return;
+                }
+
+                // Add parks & museums when map has loaded
+                map.on('load', () => {
+                    console.log('map load event fired (index.html) -- adding parks & museums layers');
+                    map.addSource('parks', { type: 'geojson', data: parks });
+
+                map.addLayer({
+                    id: 'parks-layer',
+                    type: 'circle',
+                    source: 'parks',
+                    paint: {
+                        'circle-radius': 6,
+                        'circle-color': '#2b8cbe',
+                        'circle-stroke-color': '#fff',
+                        'circle-stroke-width': 1
+                    }
+                });
+
+                map.on('click', 'parks-layer', (e) => {
+                    const f = e.features && e.features[0];
+                    if (!f) return;
+                    new mapboxgl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(`<strong>${f.properties.name}</strong><br>${f.properties.city}`)
+                        .addTo(map);
+                });
+
+                map.on('mouseenter', 'parks-layer', () => map.getCanvas().style.cursor = 'pointer');
+                map.on('mouseleave', 'parks-layer', () => map.getCanvas().style.cursor = '');
+
+                // Wire toggle for parks
+                const toggleParks = document.getElementById('toggleParks');
+                let parksVisible = true;
+                toggleParks.addEventListener('click', () => {
+                    parksVisible = !parksVisible;
+                    map.setLayoutProperty('parks-layer', 'visibility', parksVisible ? 'visible' : 'none');
+                    toggleParks.textContent = parksVisible ? 'Hide Parks' : 'Show Parks';
+                });
+
+                // Wire toggle for museums
+                const toggleMuseums = document.getElementById('toggleMuseums');
+                let museumsVisible = true;
+                toggleMuseums.addEventListener('click', () => {
+                    museumsVisible = !museumsVisible;
+                    map.setLayoutProperty('museums-layer', 'visibility', museumsVisible ? 'visible' : 'none');
+                    toggleMuseums.textContent = museumsVisible ? 'Hide Museums' : 'Show Museums';
+                });
+
+                // Populate table with parks
+                const table = document.getElementById('dataTable');
+                parks.features.forEach(feature => {
+                    const row = table.insertRow(-1);
+                    row.insertCell(0).textContent = feature.properties.name;
+                    row.insertCell(1).textContent = feature.properties.city || '';
+                });
+
+                // Add museums source and layer
+                map.addSource('museums', { type: 'geojson', data: museums });
+                map.addLayer({
+                    id: 'museums-layer',
+                    type: 'circle',
+                    source: 'museums',
+                    paint: {
+                        'circle-radius': 6,
+                        'circle-color': '#7fc97f',
+                        'circle-stroke-color': '#fff',
+                        'circle-stroke-width': 1
+                    }
+                });
+
+                map.on('click', 'museums-layer', (e) => {
+                    const f = e.features && e.features[0];
+                    if (!f) return;
+                    new mapboxgl.Popup()
+                        .setLngLat(e.lngLat)
+                        .setHTML(`<strong>${f.properties.name}</strong><br>${f.properties.city}`)
+                        .addTo(map);
+                });
+
+                map.on('mouseenter', 'museums-layer', () => map.getCanvas().style.cursor = 'pointer');
+                map.on('mouseleave', 'museums-layer', () => map.getCanvas().style.cursor = '');
+
+                // Populate table with museums (append)
+                museums.features.forEach(feature => {
+                    const row = table.insertRow(-1);
+                    row.insertCell(0).textContent = feature.properties.name;
+                    row.insertCell(1).textContent = feature.properties.city || '';
+                });
+            });
+        }
+
+        // Start loading the data (parks only)
+        loadData();
+
+        // Sort table by park name (column 0)
+        function sortTable(e) {
+            let table, rows, switching, i, x, y, shouldSwitch;
+            table = document.getElementById('dataTable');
+            switching = true;
+
+            while (switching) {
+                switching = false;
+                rows = table.rows;
+                for (i = 1; i < (rows.length - 1); i++) {
+                    shouldSwitch = false;
+                    x = rows[i].getElementsByTagName('td')[0].textContent.toLowerCase();
+                    y = rows[i + 1].getElementsByTagName('td')[0].textContent.toLowerCase();
+                    if (x > y) { // alphabetical ascending
+                        shouldSwitch = true;
+                        break;
+                    }
+                }
+                if (shouldSwitch) {
+                    rows[i].parentNode.insertBefore(rows[i + 1], rows[i]);
+                    switching = true;
+                }
+            }
+        }
+
+        // Wire sort button
+        document.getElementById('sortName').addEventListener('click', sortTable);
+    </script>
+</body>
+</html>
